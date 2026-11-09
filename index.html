@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Валютын ханш</title>
 <style>
-  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; --accent:#1a1a1a; --err:#b42318; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; --accent:#eee; --err:#f97066; } }
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; --accent:#1a1a1a; --err:#b42318; --hq:#e8f0fe; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; --accent:#eee; --err:#f97066; --hq:#1c2a40; } }
   body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
   main { max-width:960px; margin:0 auto; }
   [hidden] { display:none !important; }
@@ -26,6 +26,7 @@
   .pivot th:first-child, .pivot td:first-child { position:sticky; left:0; background:var(--bg); z-index:1; }
   .pivot thead th:first-child { background:var(--head); }
   .pivot tr.sum td { font-weight:600; background:var(--head); }
+  .pivot tr.hq td { background:var(--hq); }
   .pivot td.grand { font-weight:600; }
   .metric { display:flex; gap:4px; margin:0 0 12px; }
   .metric button { background:none; border:1px solid var(--line); border-radius:6px; color:var(--muted); font:inherit; font-size:14px; padding:4px 10px; cursor:pointer; }
@@ -110,6 +111,7 @@
     },
   };
   const TIME_COLS = ['created_at', 'updated_at'];
+  const HQ_BRANCH = 'Төв салбар'; // Нийт мөрийн яг дээр, өөр өнгөөр гарна
 
   const $ = (id) => document.getElementById(id);
   const status = $('status');
@@ -192,7 +194,8 @@
   // Салбар × огноо хүснэгт: сонгосон үзүүлэлтийн (metric) дүн, салбарын дараа нийт, доор нь өдрийн нийт.
   function renderPivot(rows) {
     const dates = [...new Set(rows.map((r) => r.sale_date))].sort();
-    const branches = [...new Set(rows.map((r) => r.branch))].sort((a, b) => a.localeCompare(b, 'mn'));
+    const branches = [...new Set(rows.map((r) => r.branch))]
+      .sort((a, b) => (a === HQ_BRANCH) - (b === HQ_BRANCH) || a.localeCompare(b, 'mn'));
     const cell = {};
     rows.forEach((r) => { cell[r.branch + '|' + r.sale_date] = r[metric]; });
 
@@ -206,7 +209,7 @@
     const head = '<tr><th>Салбар</th><th class="num">Нийт</th>' + dates.map((d) => `<th class="num">${dayLabel(d)}</th>`).join('') + '</tr>';
     const body = branches.map((b) => {
       const vals = dates.map((d) => cell[b + '|' + d]);
-      return `<tr><td>${esc(b)}</td><td class="num grand">${fmt(sum(vals))}</td>` +
+      return `<tr${b === HQ_BRANCH ? ' class="hq"' : ''}><td>${esc(b)}</td><td class="num grand">${fmt(sum(vals))}</td>` +
         vals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
     }).join('');
     const dayTotals = dates.map((d) => sum(branches.map((b) => cell[b + '|' + d])));

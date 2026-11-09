@@ -22,7 +22,14 @@
   table { border-collapse:collapse; width:100%; }
   th, td { padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
   th { background:var(--head); font-weight:600; }
-  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .pivot th:first-child, .pivot td:first-child { position:sticky; left:0; background:var(--bg); z-index:1; }
+  .pivot thead th:first-child { background:var(--head); }
+  .pivot tr.sum td { font-weight:600; background:var(--head); }
+  .pivot td.grand { font-weight:600; }
+  .metric { display:flex; gap:4px; margin:0 0 12px; }
+  .metric button { background:none; border:1px solid var(--line); border-radius:6px; color:var(--muted); font:inherit; font-size:14px; padding:4px 10px; cursor:pointer; }
+  .metric button[aria-pressed="true"] { color:var(--bg); background:var(--accent); border-color:var(--accent); }
   #login { max-width:340px; margin:48px auto; display:flex; flex-direction:column; gap:12px; }
   #login h1 { margin-bottom:4px; }
   #login label { display:flex; flex-direction:column; gap:4px; font-size:14px; color:var(--muted); }
@@ -52,6 +59,11 @@
       <button role="tab" data-view="rates" aria-selected="true">Ханш</button>
       <button role="tab" data-view="sales" aria-selected="false">Борлуулалт</button>
     </nav>
+    <div class="metric" id="metric" hidden>
+      <button data-metric="total" aria-pressed="true">Нийт</button>
+      <button data-metric="own_drug" aria-pressed="false">Өөрийн эм</button>
+      <button data-metric="other_drug" aria-pressed="false">Бусад эм</button>
+    </div>
     <p id="status">Ачаалж байна…</p>
     <div class="wrap"><table id="tbl"></table></div>
   </section>
@@ -85,7 +97,8 @@
     sales: {
       title: 'Борлуулалт',
       table: 'sales_daily',
-      order: [['sale_date', false], ['branch', true]],
+      order: [['sale_date', true], ['branch', true]],
+      pivot: true, // мөр нь салбар, багана нь огноо
       labels: {
         sale_date: 'Огноо',
         branch: 'Салбар',
@@ -103,8 +116,16 @@
   const tbl = $('tbl');
   const tabs = document.querySelectorAll('.tabs button');
   let current = null;
+  let metric = 'total';
+  let salesRows = [];
 
   tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.view)));
+
+  document.querySelectorAll('.metric button').forEach((b) => b.addEventListener('click', () => {
+    metric = b.dataset.metric;
+    document.querySelectorAll('.metric button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    renderPivot(salesRows);
+  }));
 
   $('login').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -141,6 +162,8 @@
     tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === name)));
     $('title').textContent = view.title;
     document.title = view.title;
+    $('metric').hidden = !view.pivot;
+    tbl.className = view.pivot ? 'pivot' : '';
     tbl.innerHTML = '';
     status.textContent = 'Ачаалж байна…';
 
@@ -154,6 +177,7 @@
       status.textContent = 'Мөр олдсонгүй. Хүснэгт хоосон эсвэл RLS уншихыг хориглож байна.';
       return;
     }
+    if (view.pivot) { salesRows = rows; renderPivot(rows); return; }
     const cols = Object.keys(rows[0]);
     const head = '<tr>' + cols.map((c) => `<th>${esc(view.labels[c] || c)}</th>`).join('') + '</tr>';
     const body = rows.map((r) => '<tr>' + cols.map((c) => {
@@ -163,6 +187,34 @@
     }).join('') + '</tr>').join('');
     tbl.innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
     status.textContent = `${rows.length} мөр`;
+  }
+
+  // Салбар × огноо хүснэгт: сонгосон үзүүлэлтийн (metric) дүн, салбарын дараа нийт, доор нь өдрийн нийт.
+  function renderPivot(rows) {
+    const dates = [...new Set(rows.map((r) => r.sale_date))].sort();
+    const branches = [...new Set(rows.map((r) => r.branch))].sort((a, b) => a.localeCompare(b, 'mn'));
+    const cell = {};
+    rows.forEach((r) => { cell[r.branch + '|' + r.sale_date] = r[metric]; });
+
+    const fmt = (v) => (v === null || v === undefined ? '' : v.toLocaleString('mn-MN'));
+    const sum = (vals) => {
+      const nums = vals.filter((v) => typeof v === 'number');
+      return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
+    };
+    const dayLabel = (d) => d.slice(5).replace('-', '/'); // 2026-11-03 → 11/03
+
+    const head = '<tr><th>Салбар</th><th class="num">Нийт</th>' + dates.map((d) => `<th class="num">${dayLabel(d)}</th>`).join('') + '</tr>';
+    const body = branches.map((b) => {
+      const vals = dates.map((d) => cell[b + '|' + d]);
+      return `<tr><td>${esc(b)}</td><td class="num grand">${fmt(sum(vals))}</td>` +
+        vals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
+    }).join('');
+    const dayTotals = dates.map((d) => sum(branches.map((b) => cell[b + '|' + d])));
+    const foot = `<tr class="sum"><td>Нийт</td><td class="num">${fmt(sum(dayTotals))}</td>` +
+      dayTotals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
+
+    tbl.innerHTML = `<thead>${head}</thead><tbody>${body}${foot}</tbody>`;
+    status.textContent = `${branches.length} салбар · ${dates.length} өдөр (${dayLabel(dates[0])}–${dayLabel(dates[dates.length - 1])})`;
   }
 
   // 2026-11-09T05:16:01.14527+00:00 → 2026-11-09 13:16 (Улаанбаатарын цагаар)

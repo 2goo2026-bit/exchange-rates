@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Валютын ханш</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; } }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:960px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  #status { color:var(--muted); margin:0 0 16px; }
+  .wrap { overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  th { background:var(--head); font-weight:600; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Валютын ханш</h1>
+  <p id="status">Ачаалж байна…</p>
+  <div class="wrap"><table id="tbl"></table></div>
+</main>
+<script>
+  // Supabase → Project Settings → API Keys хэсгийн anon / publishable түлхүүр.
+  // service_role эсвэл sb_secret_ түлхүүрийг энд ХЭЗЭЭ Ч бүү тавь.
+  const SUPABASE_URL = 'https://uknlvikosbvugqfmgsal.supabase.co';
+  const SUPABASE_KEY = 'ЭНД_ANON_KEY_ТАВИНА';
+  const TABLE = 'exchange_rates';
+
+  const status = document.getElementById('status');
+  const tbl = document.getElementById('tbl');
+
+  fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=*`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  })
+    .then(async (res) => {
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.message || res.statusText);
+      return body;
+    })
+    .then((rows) => {
+      if (!rows.length) {
+        status.textContent = 'Мөр олдсонгүй. Хүснэгт хоосон эсвэл RLS уншихыг хориглож байна.';
+        return;
+      }
+      const cols = Object.keys(rows[0]);
+      const head = '<tr>' + cols.map((c) => `<th>${esc(c)}</th>`).join('') + '</tr>';
+      const body = rows.map((r) => '<tr>' + cols.map((c) => {
+        const v = r[c];
+        return typeof v === 'number' ? `<td class="num">${v.toLocaleString('mn-MN')}</td>` : `<td>${esc(v ?? '')}</td>`;
+      }).join('') + '</tr>').join('');
+      tbl.innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
+      status.textContent = `${rows.length} мөр`;
+    })
+    .catch((err) => { status.textContent = 'Алдаа: ' + err.message; });
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch])); }
+</script>
+</body>
+</html>

@@ -5,11 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Валютын ханш</title>
 <style>
-  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; } }
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; --accent:#1a1a1a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; --accent:#eee; } }
   body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
   main { max-width:960px; margin:0 auto; }
-  h1 { font-size:22px; margin:0 0 4px; }
+  h1 { font-size:22px; margin:0 0 12px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:0 0 12px; }
+  .tabs button { background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); font:inherit; padding:8px 12px; cursor:pointer; }
+  .tabs button[aria-selected="true"] { color:var(--fg); border-bottom-color:var(--accent); font-weight:600; }
   #status { color:var(--muted); margin:0 0 16px; }
   .wrap { overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
   table { border-collapse:collapse; width:100%; }
@@ -21,6 +24,10 @@
 <body>
 <main>
   <h1>Валютын ханш</h1>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="rates" aria-selected="true">Ханш</button>
+    <button role="tab" data-view="sales" aria-selected="false">Борлуулалт</button>
+  </nav>
   <p id="status">Ачаалж байна…</p>
   <div class="wrap"><table id="tbl"></table></div>
 </main>
@@ -29,48 +36,85 @@
   // service_role эсвэл sb_secret_ түлхүүрийг энд ХЭЗЭЭ Ч бүү тавь.
   const SUPABASE_URL = 'https://uknlvikosbvugqfmgsal.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_umG85ReE6BYMHuk3Nbh7ng_t1yxW3uw';
-  const TABLE = 'exchange_rates';
 
-  // Баганын харагдах нэр. Энд байхгүй багана өөрийн нэрээрээ гарна.
-  const LABELS = {
-    id: 'ID',
-    rate_date: 'Огноо',
-    mb_usd: 'Монголбанк USD',
-    mb_eur: 'Монголбанк EUR',
-    mb_cny: 'Монголбанк CNY',
-    golomt_usd: 'Голомт USD',
-    golomt_eur: 'Голомт EUR',
-    golomt_cny: 'Голомт CNY',
-    created_at: 'Бүртгэсэн',
+  // Таб бүрийн хүснэгт, эрэмбэ, баганын харагдах нэр. Энд байхгүй багана өөрийн нэрээрээ гарна.
+  const VIEWS = {
+    rates: {
+      title: 'Валютын ханш',
+      table: 'exchange_rates',
+      order: 'rate_date.desc',
+      labels: {
+        id: 'ID',
+        rate_date: 'Огноо',
+        mb_usd: 'Монголбанк USD',
+        mb_eur: 'Монголбанк EUR',
+        mb_cny: 'Монголбанк CNY',
+        golomt_usd: 'Голомт USD',
+        golomt_eur: 'Голомт EUR',
+        golomt_cny: 'Голомт CNY',
+        created_at: 'Бүртгэсэн',
+      },
+    },
+    sales: {
+      title: 'Борлуулалт',
+      table: 'sales_daily',
+      order: 'sale_date.desc,branch.asc',
+      labels: {
+        sale_date: 'Огноо',
+        branch: 'Салбар',
+        own_drug: 'Өөрийн эм',
+        other_drug: 'Бусад эм',
+        total: 'Нийт',
+        updated_at: 'Шинэчилсэн',
+      },
+    },
   };
+  const TIME_COLS = ['created_at', 'updated_at'];
 
   const status = document.getElementById('status');
   const tbl = document.getElementById('tbl');
+  const h1 = document.querySelector('h1');
+  const tabs = document.querySelectorAll('.tabs button');
+  let current = null;
 
-  fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=rate_date.desc`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-  })
-    .then(async (res) => {
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.message || res.statusText);
-      return body;
+  tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.view)));
+  show('rates');
+
+  function show(name) {
+    const view = VIEWS[name];
+    current = name;
+    tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === name)));
+    h1.textContent = view.title;
+    document.title = view.title;
+    tbl.innerHTML = '';
+    status.textContent = 'Ачаалж байна…';
+
+    fetch(`${SUPABASE_URL}/rest/v1/${view.table}?select=*&order=${view.order}`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
     })
-    .then((rows) => {
-      if (!rows.length) {
-        status.textContent = 'Мөр олдсонгүй. Хүснэгт хоосон эсвэл RLS уншихыг хориглож байна.';
-        return;
-      }
-      const cols = Object.keys(rows[0]);
-      const head = '<tr>' + cols.map((c) => `<th>${esc(LABELS[c] || c)}</th>`).join('') + '</tr>';
-      const body = rows.map((r) => '<tr>' + cols.map((c) => {
-        const v = r[c];
-        if (c === 'created_at' && v) return `<td>${esc(shortTime(v))}</td>`;
-        return typeof v === 'number' ? `<td class="num">${v.toLocaleString('mn-MN')}</td>` : `<td>${esc(v ?? '')}</td>`;
-      }).join('') + '</tr>').join('');
-      tbl.innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
-      status.textContent = `${rows.length} мөр`;
-    })
-    .catch((err) => { status.textContent = 'Алдаа: ' + err.message; });
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.message || res.statusText);
+        return body;
+      })
+      .then((rows) => {
+        if (current !== name) return; // өөр таб руу шилжсэн
+        if (!rows.length) {
+          status.textContent = 'Мөр олдсонгүй. Хүснэгт хоосон эсвэл RLS уншихыг хориглож байна.';
+          return;
+        }
+        const cols = Object.keys(rows[0]);
+        const head = '<tr>' + cols.map((c) => `<th>${esc(view.labels[c] || c)}</th>`).join('') + '</tr>';
+        const body = rows.map((r) => '<tr>' + cols.map((c) => {
+          const v = r[c];
+          if (TIME_COLS.includes(c) && v) return `<td>${esc(shortTime(v))}</td>`;
+          return typeof v === 'number' ? `<td class="num">${v.toLocaleString('mn-MN')}</td>` : `<td>${esc(v ?? '')}</td>`;
+        }).join('') + '</tr>').join('');
+        tbl.innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
+        status.textContent = `${rows.length} мөр`;
+      })
+      .catch((err) => { status.textContent = 'Алдаа: ' + err.message; });
+  }
 
   // 2026-11-09T05:16:01.14527+00:00 → 2026-11-09 13:16 (Улаанбаатарын цагаар)
   function shortTime(iso) {

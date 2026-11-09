@@ -61,6 +61,7 @@
     <nav class="tabs" role="tablist">
       <button role="tab" data-view="rates" aria-selected="true">Ханш</button>
       <button role="tab" data-view="sales" aria-selected="false">Борлуулалт</button>
+      <button role="tab" data-view="stock" aria-selected="false">Барааны үлдэгдэл</button>
     </nav>
     <div class="metric" id="metric" hidden>
       <button data-metric="total" aria-pressed="true">Нийт</button>
@@ -102,6 +103,7 @@
       table: 'sales_daily',
       order: [['sale_date', true], ['branch', true]],
       pivot: true, // мөр нь салбар, багана нь огноо
+      metrics: true,
       labels: {
         sale_date: 'Огноо',
         branch: 'Салбар',
@@ -110,6 +112,14 @@
         total: 'Нийт',
         updated_at: 'Шинэчилсэн',
       },
+    },
+    stock: {
+      title: 'Барааны үлдэгдэл',
+      table: 'inventory',
+      pivot: true, // мөр нь бараа, багана нь байршил; зөвхөн хамгийн сүүлийн огнооны үлдэгдэл
+      latest: 'snapshot_date',
+      order: [['code', true], ['loc_order', true]],
+      labels: {},
     },
   };
   const TIME_COLS = ['created_at', 'updated_at'];
@@ -166,12 +176,20 @@
     tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === name)));
     $('title').textContent = view.title;
     document.title = view.title;
-    $('metric').hidden = !view.pivot;
+    $('metric').hidden = !view.metrics;
     tbl.className = view.pivot ? 'pivot' : '';
     tbl.innerHTML = '';
     status.textContent = 'Ачаалж байна…';
 
     let q = sb.from(view.table).select('*');
+    let latest = null;
+    if (view.latest) {
+      // Хамгийн сүүлийн огноог олоод зөвхөн тэр огнооны мөрүүдийг авна
+      const r = await sb.from(view.table).select(view.latest).order(view.latest, { ascending: false }).limit(1);
+      if (r.error) { if (current === name) status.textContent = 'Алдаа: ' + r.error.message; return; }
+      latest = r.data[0] ? r.data[0][view.latest] : null;
+      if (latest) q = q.eq(view.latest, latest);
+    }
     view.order.forEach(([col, ascending]) => { q = q.order(col, { ascending }); });
     const { data: rows, error } = await q;
 
@@ -181,7 +199,8 @@
       status.textContent = 'Мөр олдсонгүй. Хүснэгт хоосон эсвэл RLS уншихыг хориглож байна.';
       return;
     }
-    if (view.pivot) { salesRows = rows; renderPivot(rows); return; }
+    if (name === 'sales') { salesRows = rows; renderPivot(rows); return; }
+    if (name === 'stock') { renderStock(rows, latest); return; }
     const cols = Object.keys(rows[0]);
     const head = '<tr>' + cols.map((c) => `<th>${esc(view.labels[c] || c)}</th>`).join('') + '</tr>';
     const body = rows.map((r) => '<tr>' + cols.map((c) => {
@@ -200,27 +219,58 @@
       .sort((a, b) => (a === HQ_BRANCH) - (b === HQ_BRANCH) || a.localeCompare(b, 'mn'));
     const cell = {};
     rows.forEach((r) => { cell[r.branch + '|' + r.sale_date] = r[metric]; });
+    const dayLabel = (d) => d.slice(5).replace('-', '/'); // 2026-11-03 → 11/03
 
+    pivotTable({
+      rowKeys: branches, colKeys: dates,
+      rowHead: 'Салбар', totalHead: 'Энэ сарын нийт борлуулалт',
+      colLabel: dayLabel, rowLabel: (b) => esc(b),
+      rowClass: (b) => (b === HQ_BRANCH ? 'hq' : ''),
+      get: (b, d) => cell[b + '|' + d],
+    });
+    status.textContent = `${branches.length} салбар · ${dates.length} өдөр (${dayLabel(dates[0])}–${dayLabel(dates[dates.length - 1])})`;
+  }
+
+  // Барааны код × байршил хүснэгт. Байршлууд Sheet дээрх дарааллаараа (loc_order), нэр нь кодын tooltip.
+  function renderStock(rows, date) {
+    const locs = [...new Map(rows.map((r) => [r.location, r.loc_order])).entries()]
+      .sort((a, b) => a[1] - b[1]).map(([l]) => l);
+    const names = {};
+    const cell = {};
+    rows.forEach((r) => { names[r.code] = r.name; cell[r.code + '|' + r.location] = r.qty; });
+    const codes = Object.keys(names).sort();
+
+    pivotTable({
+      rowKeys: codes, colKeys: locs,
+      rowHead: 'Код', totalHead: 'Нийт үлдэгдэл',
+      colLabel: (l) => esc(l), rowLabel: (c) => `<span title="${esc(names[c])}">${esc(c)}</span>`,
+      rowClass: () => '',
+      get: (c, l) => cell[c + '|' + l],
+    });
+    status.textContent = `${date} өдрийн үлдэгдэл · ${codes.length} бараа · ${locs.length} байршил`;
+  }
+
+  // Мөр × багана хүснэгт: эхний хоёр багана (нэр, нийт) хөдөлгөөнгүй, доод мөрөнд баганын нийт.
+  function pivotTable({ rowKeys, colKeys, rowHead, totalHead, colLabel, rowLabel, rowClass, get }) {
     const fmt = (v) => (v === null || v === undefined ? '' : v.toLocaleString('mn-MN'));
     const sum = (vals) => {
       const nums = vals.filter((v) => typeof v === 'number');
       return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
     };
-    const dayLabel = (d) => d.slice(5).replace('-', '/'); // 2026-11-03 → 11/03
 
-    const head = '<tr><th>Салбар</th><th class="num">Энэ сарын нийт борлуулалт</th>' + dates.map((d) => `<th class="num">${dayLabel(d)}</th>`).join('') + '</tr>';
-    const body = branches.map((b) => {
-      const vals = dates.map((d) => cell[b + '|' + d]);
-      return `<tr${b === HQ_BRANCH ? ' class="hq"' : ''}><td>${esc(b)}</td><td class="num grand">${fmt(sum(vals))}</td>` +
+    const head = `<tr><th>${rowHead}</th><th class="num">${totalHead}</th>` + colKeys.map((k) => `<th class="num">${colLabel(k)}</th>`).join('') + '</tr>';
+    const body = rowKeys.map((rk) => {
+      const vals = colKeys.map((ck) => get(rk, ck));
+      const cls = rowClass(rk);
+      return `<tr${cls ? ` class="${cls}"` : ''}><td>${rowLabel(rk)}</td><td class="num grand">${fmt(sum(vals))}</td>` +
         vals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
     }).join('');
-    const dayTotals = dates.map((d) => sum(branches.map((b) => cell[b + '|' + d])));
-    const foot = `<tr class="sum"><td>Нийт</td><td class="num">${fmt(sum(dayTotals))}</td>` +
-      dayTotals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
+    const colTotals = colKeys.map((ck) => sum(rowKeys.map((rk) => get(rk, ck))));
+    const foot = `<tr class="sum"><td>Нийт</td><td class="num">${fmt(sum(colTotals))}</td>` +
+      colTotals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
 
     tbl.innerHTML = `<thead>${head}</thead><tbody>${body}${foot}</tbody>`;
     tbl.style.setProperty('--c1', tbl.querySelector('th').offsetWidth + 'px');
-    status.textContent = `${branches.length} салбар · ${dates.length} өдөр (${dayLabel(dates[0])}–${dayLabel(dates[dates.length - 1])})`;
   }
 
   // 2026-11-09T05:16:01.14527+00:00 → 2026-11-09 13:16 (Улаанбаатарын цагаар)

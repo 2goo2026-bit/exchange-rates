@@ -6,7 +6,7 @@
 <title>Валютын ханш</title>
 <style>
   :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; --accent:#1a1a1a; --err:#b42318; --hq:#52f520;
-    /* График: s1 Өөрийн эм, s2 Бусад эм; heat1–5 нь хүснэгтийн бага→их шатлал */
+    /* График: s1 Өөрийн бараа, s2 Бусад бараа; heat1–5 нь хүснэгтийн бага→их шатлал */
     --s1:#2a78d6; --s2:#eb6834; --grid:#e1e0d9; --axis:#c3c2b7;
     --heat1:#cde2fb; --heat2:#b7d3f6; --heat3:#9ec5f4; --heat4:#86b6ef; --heat5:#6da7ec; --heat-ink:#0b0b0b; }
   @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; --accent:#eee; --err:#f97066; --hq:#1c2a40;
@@ -99,13 +99,13 @@
       <div class="card">
         <h2>Өдрийн борлуулалт</h2>
         <p class="sub" id="dailySub"></p>
-        <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Өөрийн эм</span><span><i class="sw" style="background:var(--s2)"></i>Бусад эм</span></div>
+        <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Өөрийн бараа</span><span><i class="sw" style="background:var(--s2)"></i>Бусад бараа</span></div>
         <div id="dailyChart"></div>
       </div>
       <div class="card">
         <h2>Салбарын борлуулалт (сарын эхнээс)</h2>
         <p class="sub" id="branchSub"></p>
-        <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Өөрийн эм</span><span><i class="sw" style="background:var(--s2)"></i>Бусад эм</span></div>
+        <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Өөрийн бараа</span><span><i class="sw" style="background:var(--s2)"></i>Бусад бараа</span></div>
         <div id="branchChart"></div>
       </div>
     </div>
@@ -146,12 +146,12 @@
       table: 'sales_daily',
       order: [['sale_date', true], ['branch', true]],
       pivot: true, // мөр нь салбар, багана нь огноо
-      metrics: [['total', 'Нийт'], ['own_drug', 'Өөрийн эм'], ['other_drug', 'Бусад эм']],
+      metrics: [['total', 'Нийт'], ['own_drug', 'Өөрийн бараа'], ['other_drug', 'Бусад бараа']],
       labels: {
         sale_date: 'Огноо',
         branch: 'Салбар',
-        own_drug: 'Өөрийн эм',
-        other_drug: 'Бусад эм',
+        own_drug: 'Өөрийн бараа',
+        other_drug: 'Бусад бараа',
         total: 'Нийт',
         updated_at: 'Шинэчилсэн',
       },
@@ -416,7 +416,7 @@
     }).sort((x, y) => (y.own + y.other) - (x.own + x.other));
 
     $('dailySub').textContent = `${names.length} салбарын нийлбэр.${hqNote}`;
-    $('branchSub').textContent = `Багана бүрийн ард: нийт дүн · өөрийн эмийн хувь.${hqNote}`;
+    $('branchSub').textContent = `Багана бүрийн ард: нийт дүн · өөрийн барааны хувь.${hqNote}`;
     dailyChart($('dailyChart'), byDay, dayLabel);
     branchChart($('branchChart'), byBranch);
   }
@@ -435,7 +435,7 @@
     return [1, 2, 5, 10].map((m) => m * p).find((s) => s >= raw);
   }
 
-  // 1. Өдөр бүрийн давхарласан багана: доор Өөрийн эм, дээр Бусад эм
+  // 1. Өдөр бүрийн давхарласан багана: доор Өөрийн бараа, дээр Бусад бараа
   function dailyChart(el, data, dayLabel) {
     const W = el.clientWidth || 560, H = 220, m = { l: 52, r: 4, t: 8, b: 22 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b;
@@ -457,13 +457,13 @@
       if (hOwn > 0) s += `<path d="${colPath(x, y(d.own), bw, hOwn, hOther > 0 ? 0 : 4)}" fill="var(--s1)"/>`;
       if (hOther > gap) s += `<path d="${colPath(x, y(d.own + d.other), bw, hOther - gap, 4)}" fill="var(--s2)"/>`;
       if (i % every === 0) s += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${Number(d.d.slice(8))}</text>`;
-      const tip = `${dayLabel(d.d)}\nӨөрийн эм  ${money(d.own)}\nБусад эм   ${money(d.other)}\nНийт       ${money(d.own + d.other)}`;
+      const tip = `${dayLabel(d.d)}\nӨөрийн бараа  ${money(d.own)}\nБусад бараа   ${money(d.other)}\nНийт          ${money(d.own + d.other)}`;
       s += `<rect x="${m.l + band * i}" y="${m.t}" width="${band}" height="${ih}" fill="transparent" data-tip="${esc(tip)}"/>`;
     });
-    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Өдрийн борлуулалт, өөрийн эм болон бусад эм">${s}</svg>`;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Өдрийн борлуулалт, өөрийн бараа болон бусад бараа">${s}</svg>`;
   }
 
-  // 2. Салбарын хэвтээ багана, их нь дээрээ; ард нь нийт дүн ба өөрийн эмийн хувь
+  // 2. Салбарын хэвтээ багана, их нь дээрээ; ард нь нийт дүн ба өөрийн барааны хувь
   function branchChart(el, data) {
     const W = el.clientWidth || 380, row = 28, bh = 16, lw = 150, tipW = 96;
     const H = data.length * row + 4, iw = Math.max(40, W - lw - tipW);
@@ -480,7 +480,7 @@
       if (wOther > gap) s += `<path d="${rowPath(lw + wOwn + gap, yy, wOther - gap, bh, 4)}" fill="var(--s2)"/>`;
       const pct = total ? Math.round((d.own / total) * 100) : 0;
       s += `<text class="val" x="${lw + wOwn + wOther + 6}" y="${yy + bh / 2 + 4}">${mln(total)} · ${pct}%</text>`;
-      const tip = `${d.b}\nӨөрийн эм  ${money(d.own)} (${pct}%)\nБусад эм   ${money(d.other)}\nНийт       ${money(total)}`;
+      const tip = `${d.b}\nӨөрийн бараа  ${money(d.own)} (${pct}%)\nБусад бараа   ${money(d.other)}\nНийт          ${money(total)}`;
       s += `<rect x="0" y="${i * row}" width="${W}" height="${row}" fill="transparent" data-tip="${esc(tip)}"/>`;
     });
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Салбарын борлуулалт, сарын эхнээс">${s}</svg>`;

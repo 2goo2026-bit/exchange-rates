@@ -5,16 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Валютын ханш</title>
 <style>
-  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; --accent:#1a1a1a; --err:#b42318; --hq:#52f520; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; --accent:#eee; --err:#f97066; --hq:#1c2a40; } }
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --head:#f5f5f5; --accent:#1a1a1a; --err:#b42318; --hq:#52f520;
+    /* График: s1 Өөрийн эм, s2 Бусад эм; heat1–5 нь хүснэгтийн бага→их шатлал */
+    --s1:#2a78d6; --s2:#eb6834; --grid:#e1e0d9; --axis:#c3c2b7;
+    --heat1:#cde2fb; --heat2:#b7d3f6; --heat3:#9ec5f4; --heat4:#86b6ef; --heat5:#6da7ec; --heat-ink:#0b0b0b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#eee; --muted:#999; --line:#333; --head:#1f1f1f; --accent:#eee; --err:#f97066; --hq:#1c2a40;
+    --s1:#3987e5; --s2:#d95926; --grid:#2c2c2a; --axis:#383835;
+    --heat1:#0d366b; --heat2:#104281; --heat3:#184f95; --heat4:#1c5cab; --heat5:#256abf; --heat-ink:#f0efec; } }
   body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
   main { max-width:960px; margin:0 auto; }
   [hidden] { display:none !important; }
-  header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; }
+  header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; }
   h1 { font-size:22px; margin:0; }
   .user { color:var(--muted); font-size:14px; display:flex; align-items:center; gap:8px; }
   button.link { background:none; border:1px solid var(--line); border-radius:6px; color:var(--fg); font:inherit; font-size:14px; padding:4px 10px; cursor:pointer; }
-  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:0 0 12px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:0 0 12px; overflow-x:auto; }
+  .tabs button { flex:none; white-space:nowrap; }
   .tabs button { background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); font:inherit; padding:8px 12px; cursor:pointer; }
   .tabs button[aria-selected="true"] { color:var(--fg); border-bottom-color:var(--accent); font-weight:600; }
   #status { color:var(--muted); margin:0 0 16px; }
@@ -36,6 +42,24 @@
   .metric { display:flex; gap:4px; }
   .metric button { background:none; border:1px solid var(--line); border-radius:6px; color:var(--muted); font:inherit; font-size:14px; padding:4px 10px; cursor:pointer; }
   .metric button[aria-pressed="true"] { color:var(--bg); background:var(--accent); border-color:var(--accent); }
+  .charts { display:grid; grid-template-columns:minmax(0, 1fr); gap:16px; margin:0 0 16px; }
+  @media (min-width:800px) { .charts { grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); } }
+  /* Утсан дээр хөдөлгөөнгүй 2 багана дэлгэцийг дүүргэхгүйн тулд нийт баганын гарчгийг мөрөнд хуваана */
+  .pivot thead th:nth-child(2) { white-space:normal; min-width:96px; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px 16px; min-width:0; }
+  .card h2 { font-size:15px; margin:0; }
+  .card .sub { color:var(--muted); font-size:13px; margin:2px 0 8px; }
+  .card svg { display:block; width:100%; overflow:visible; }
+  .card svg text { font:12px system-ui, sans-serif; fill:var(--muted); }
+  .card svg text.val { fill:var(--fg); }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:13px; color:var(--muted); margin:0 0 8px; }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+  .heatkey { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); margin:0 0 8px; }
+  .heatkey i { display:inline-block; width:18px; height:10px; }
+  [data-tip] { cursor:default; }
+  #tip { position:fixed; pointer-events:none; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-size:13px; line-height:1.5; box-shadow:0 4px 12px rgba(0,0,0,.15); z-index:10; white-space:pre; font-variant-numeric:tabular-nums; }
+  td.h1 { background:var(--heat1); color:var(--heat-ink); } td.h2 { background:var(--heat2); color:var(--heat-ink); }
+  td.h3 { background:var(--heat3); color:var(--heat-ink); } td.h4 { background:var(--heat4); color:var(--heat-ink); } td.h5 { background:var(--heat5); color:var(--heat-ink); }
   #login { max-width:340px; margin:48px auto; display:flex; flex-direction:column; gap:12px; }
   #login h1 { margin-bottom:4px; }
   #login label { display:flex; flex-direction:column; gap:4px; font-size:14px; color:var(--muted); }
@@ -71,9 +95,25 @@
       <div class="metric" id="metric" hidden></div>
       <input type="search" id="filter" placeholder="Код эсвэл нэрээр хайх" hidden>
     </div>
+    <div class="charts" id="charts" hidden>
+      <div class="card">
+        <h2>Өдрийн борлуулалт</h2>
+        <p class="sub" id="dailySub"></p>
+        <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Өөрийн эм</span><span><i class="sw" style="background:var(--s2)"></i>Бусад эм</span></div>
+        <div id="dailyChart"></div>
+      </div>
+      <div class="card">
+        <h2>Салбарын борлуулалт (сарын эхнээс)</h2>
+        <p class="sub" id="branchSub"></p>
+        <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Өөрийн эм</span><span><i class="sw" style="background:var(--s2)"></i>Бусад эм</span></div>
+        <div id="branchChart"></div>
+      </div>
+    </div>
+    <div class="heatkey" id="heatkey" hidden>Хүснэгтийн өнгө: бага <i style="background:var(--heat1)"></i><i style="background:var(--heat2)"></i><i style="background:var(--heat3)"></i><i style="background:var(--heat4)"></i><i style="background:var(--heat5)"></i> их</div>
     <p id="status">Ачаалж байна…</p>
     <div class="wrap"><table id="tbl"></table></div>
   </section>
+  <div id="tip" hidden></div>
 </main>
 <script>
   // Supabase → Project Settings → API Keys хэсгийн anon / publishable түлхүүр.
@@ -219,6 +259,8 @@
     $('title').textContent = view.title;
     document.title = view.title;
     metricBar(name);
+    $('charts').hidden = name !== 'sales';
+    $('heatkey').hidden = name !== 'sales';
     $('filter').hidden = !view.search;
     $('filter').value = '';
     tbl.className = view.pivot ? 'pivot' : '';
@@ -267,13 +309,21 @@
     rows.forEach((r) => { cell[r.branch + '|' + r.sale_date] = r[metric]; });
     const dayLabel = (d) => d.slice(5).replace('-', '/'); // 2026-11-03 → 11/03
 
+    // Heatmap: Төв салбараас бусад нүдний хамгийн бага–их утгын хооронд 5 шатлалд хуваана
+    const hv = rows.filter((r) => r.branch !== HQ_BRANCH && r[metric]).map((r) => r[metric]);
+    const hMin = Math.min(...hv), hMax = Math.max(...hv);
+    const heat = (b, v) => (b === HQ_BRANCH || !v || !hv.length ? ''
+      : 'h' + (hMax === hMin ? 3 : Math.min(5, 1 + Math.floor(((v - hMin) / (hMax - hMin)) * 5))));
+
     pivotTable({
       rowKeys: branches, colKeys: dates,
       rowHead: 'Салбар', totalHead: 'Энэ сарын нийт борлуулалт',
       colLabel: dayLabel, rowLabel: (b) => esc(b),
       rowClass: (b) => (b === HQ_BRANCH ? 'hq' : ''),
       get: (b, d) => cell[b + '|' + d],
+      heat,
     });
+    salesCharts(rows, dates, dayLabel);
     status.textContent = `${branches.length} салбар · ${dates.length} өдөр (${dayLabel(dates[0])}–${dayLabel(dates[dates.length - 1])})`;
   }
 
@@ -324,7 +374,7 @@
   }
 
   // Мөр × багана хүснэгт: эхний хоёр багана (нэр, нийт) хөдөлгөөнгүй, доод мөрөнд баганын нийт.
-  function pivotTable({ rowKeys, colKeys, rowHead, totalHead, colLabel, rowLabel, rowClass, get }) {
+  function pivotTable({ rowKeys, colKeys, rowHead, totalHead, colLabel, rowLabel, rowClass, get, heat }) {
     const fmt = (v) => (v === null || v === undefined ? '' : v.toLocaleString('mn-MN'));
     const sum = (vals) => {
       const nums = vals.filter((v) => typeof v === 'number');
@@ -336,7 +386,7 @@
       const vals = colKeys.map((ck) => get(rk, ck));
       const cls = rowClass(rk);
       return `<tr${cls ? ` class="${cls}"` : ''}><td>${rowLabel(rk)}</td><td class="num grand">${fmt(sum(vals))}</td>` +
-        vals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
+        vals.map((v) => `<td class="num ${heat ? heat(rk, v) : ''}">${fmt(v)}</td>`).join('') + '</tr>';
     }).join('');
     const colTotals = colKeys.map((ck) => sum(rowKeys.map((rk) => get(rk, ck))));
     const foot = `<tr class="sum"><td>Нийт</td><td class="num">${fmt(sum(colTotals))}</td>` +
@@ -345,6 +395,112 @@
     tbl.innerHTML = `<thead>${head}</thead><tbody>${body}${foot}</tbody>`;
     tbl.style.setProperty('--c1', tbl.querySelector('th').offsetWidth + 'px');
   }
+
+  // ---- Борлуулалт табын графикууд (Төв салбар бусдаас 10 дахин том тул графикт оруулахгүй) ----
+  const money = (v) => Math.round(v).toLocaleString('mn-MN');
+  const mln = (v) => (v / 1e6).toLocaleString('mn-MN', { maximumFractionDigits: 1 }) + ' сая';
+
+  function salesCharts(rows, dates, dayLabel) {
+    const br = rows.filter((r) => r.branch !== HQ_BRANCH);
+    const hq = rows.filter((r) => r.branch === HQ_BRANCH).reduce((a, r) => a + (r.total || 0), 0);
+    const hqNote = hq ? ` Төв салбар (${mln(hq)}) ороогүй.` : '';
+
+    const byDay = dates.map((d) => {
+      const rs = br.filter((r) => r.sale_date === d);
+      return { d, own: rs.reduce((a, r) => a + (r.own_drug || 0), 0), other: rs.reduce((a, r) => a + (r.other_drug || 0), 0) };
+    });
+    const names = [...new Set(br.map((r) => r.branch))];
+    const byBranch = names.map((b) => {
+      const rs = br.filter((r) => r.branch === b);
+      return { b, own: rs.reduce((a, r) => a + (r.own_drug || 0), 0), other: rs.reduce((a, r) => a + (r.other_drug || 0), 0) };
+    }).sort((x, y) => (y.own + y.other) - (x.own + x.other));
+
+    $('dailySub').textContent = `${names.length} салбарын нийлбэр.${hqNote}`;
+    $('branchSub').textContent = `Багана бүрийн ард: нийт дүн · өөрийн эмийн хувь.${hqNote}`;
+    dailyChart($('dailyChart'), byDay, dayLabel);
+    branchChart($('branchChart'), byBranch);
+  }
+
+  // Дээд/баруун үзүүрийг 4px дугуйлсан, суурь талдаа шулуун зам
+  function colPath(x, y, w, h, r) {
+    r = Math.min(r, h, w / 2);
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+  function rowPath(x, y, w, h, r) {
+    r = Math.min(r, w, h / 2);
+    return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`;
+  }
+  function niceStep(max, count) {
+    const raw = max / count, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    return [1, 2, 5, 10].map((m) => m * p).find((s) => s >= raw);
+  }
+
+  // 1. Өдөр бүрийн давхарласан багана: доор Өөрийн эм, дээр Бусад эм
+  function dailyChart(el, data, dayLabel) {
+    const W = el.clientWidth || 560, H = 220, m = { l: 52, r: 4, t: 8, b: 22 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const max = Math.max(1, ...data.map((d) => d.own + d.other));
+    const step = niceStep(max, 4), top = Math.ceil(max / step) * step;
+    const y = (v) => m.t + ih - (v / top) * ih;
+    const band = iw / data.length, bw = Math.min(24, band * 0.6);
+    const every = Math.ceil(data.length / Math.max(1, Math.floor(iw / 28)));
+
+    let s = '';
+    for (let v = 0; v <= top; v += step) {
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${v ? 'var(--grid)' : 'var(--axis)'}"/>`;
+      s += `<text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${v ? mln(v) : '0'}</text>`;
+    }
+    data.forEach((d, i) => {
+      const x = m.l + band * i + (band - bw) / 2;
+      const hOwn = (d.own / top) * ih, hOther = (d.other / top) * ih;
+      const gap = hOwn > 0 && hOther > 0 ? 2 : 0;
+      if (hOwn > 0) s += `<path d="${colPath(x, y(d.own), bw, hOwn, hOther > 0 ? 0 : 4)}" fill="var(--s1)"/>`;
+      if (hOther > gap) s += `<path d="${colPath(x, y(d.own + d.other), bw, hOther - gap, 4)}" fill="var(--s2)"/>`;
+      if (i % every === 0) s += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${Number(d.d.slice(8))}</text>`;
+      const tip = `${dayLabel(d.d)}\nӨөрийн эм  ${money(d.own)}\nБусад эм   ${money(d.other)}\nНийт       ${money(d.own + d.other)}`;
+      s += `<rect x="${m.l + band * i}" y="${m.t}" width="${band}" height="${ih}" fill="transparent" data-tip="${esc(tip)}"/>`;
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Өдрийн борлуулалт, өөрийн эм болон бусад эм">${s}</svg>`;
+  }
+
+  // 2. Салбарын хэвтээ багана, их нь дээрээ; ард нь нийт дүн ба өөрийн эмийн хувь
+  function branchChart(el, data) {
+    const W = el.clientWidth || 380, row = 28, bh = 16, lw = 150, tipW = 96;
+    const H = data.length * row + 4, iw = Math.max(40, W - lw - tipW);
+    const max = Math.max(1, ...data.map((d) => d.own + d.other));
+
+    let s = `<line x1="${lw}" x2="${lw}" y1="0" y2="${H}" stroke="var(--axis)"/>`;
+    data.forEach((d, i) => {
+      const yy = i * row + (row - bh) / 2, total = d.own + d.other;
+      const wOwn = (d.own / max) * iw, wOther = (d.other / max) * iw;
+      const gap = wOwn > 0 && wOther > 0 ? 2 : 0;
+      const label = d.b.length > 22 ? d.b.slice(0, 21) + '…' : d.b;
+      s += `<text x="${lw - 8}" y="${yy + bh / 2 + 4}" text-anchor="end">${esc(label)}</text>`;
+      if (wOwn > 0) s += `<path d="${rowPath(lw, yy, wOwn, bh, wOther > 0 ? 0 : 4)}" fill="var(--s1)"/>`;
+      if (wOther > gap) s += `<path d="${rowPath(lw + wOwn + gap, yy, wOther - gap, bh, 4)}" fill="var(--s2)"/>`;
+      const pct = total ? Math.round((d.own / total) * 100) : 0;
+      s += `<text class="val" x="${lw + wOwn + wOther + 6}" y="${yy + bh / 2 + 4}">${mln(total)} · ${pct}%</text>`;
+      const tip = `${d.b}\nӨөрийн эм  ${money(d.own)} (${pct}%)\nБусад эм   ${money(d.other)}\nНийт       ${money(total)}`;
+      s += `<rect x="0" y="${i * row}" width="${W}" height="${row}" fill="transparent" data-tip="${esc(tip)}"/>`;
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Салбарын борлуулалт, сарын эхнээс">${s}</svg>`;
+  }
+
+  // Графикийн tooltip: data-tip бүхий элемент дээр хулгана очиход гарна
+  const tipEl = $('tip');
+  $('charts').addEventListener('mousemove', (e) => {
+    const t = e.target.closest('[data-tip]');
+    if (!t) { tipEl.hidden = true; return; }
+    tipEl.textContent = t.dataset.tip;
+    tipEl.hidden = false;
+    const r = tipEl.getBoundingClientRect();
+    tipEl.style.left = Math.min(e.clientX + 14, innerWidth - r.width - 8) + 'px';
+    tipEl.style.top = Math.min(e.clientY + 14, innerHeight - r.height - 8) + 'px';
+  });
+  $('charts').addEventListener('mouseleave', () => { tipEl.hidden = true; });
+
+  let resizeTimer;
+  addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (current === 'sales') render(); }, 150); });
 
   // 2026-11-09T05:16:01.14527+00:00 → 2026-11-09 13:16 (Улаанбаатарын цагаар)
   function shortTime(iso) {

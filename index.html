@@ -64,12 +64,22 @@
       const head = '<tr>' + cols.map((c) => `<th>${esc(LABELS[c] || c)}</th>`).join('') + '</tr>';
       const body = rows.map((r) => '<tr>' + cols.map((c) => {
         const v = r[c];
+        if (c === 'created_at' && v) return `<td>${esc(shortTime(v))}</td>`;
         return typeof v === 'number' ? `<td class="num">${v.toLocaleString('mn-MN')}</td>` : `<td>${esc(v ?? '')}</td>`;
       }).join('') + '</tr>').join('');
       tbl.innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
       status.textContent = `${rows.length} мөр`;
     })
     .catch((err) => { status.textContent = 'Алдаа: ' + err.message; });
+
+  // 2026-11-09T05:16:01.14527+00:00 → 2026-11-09 13:16 (Улаанбаатарын цагаар)
+  function shortTime(iso) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+  }
 
   function esc(s) { return String(s).replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch])); }
 </script>

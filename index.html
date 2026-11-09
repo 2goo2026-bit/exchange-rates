@@ -23,8 +23,10 @@
   th, td { padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
   th { background:var(--head); font-weight:600; }
   td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
-  .pivot th:first-child, .pivot td:first-child { position:sticky; left:0; background:var(--bg); z-index:1; }
-  .pivot thead th:first-child { background:var(--head); }
+  /* Салбар болон сарын нийт багана хөдөлгөөнгүй; --c1 нь Салбар баганын өргөн (JS хэмжиж тавина) */
+  .pivot th:nth-child(-n+2), .pivot td:nth-child(-n+2) { position:sticky; left:0; background:var(--bg); z-index:1; }
+  .pivot th:nth-child(2), .pivot td:nth-child(2) { left:var(--c1, 0); box-shadow:inset -1px 0 0 var(--line); }
+  .pivot thead th:nth-child(-n+2) { background:var(--head); }
   .pivot tr.sum td { font-weight:600; background:var(--head); }
   .pivot tr.hq td { background:var(--hq); }
   .pivot td.grand { font-weight:600; }
@@ -206,7 +208,7 @@
     };
     const dayLabel = (d) => d.slice(5).replace('-', '/'); // 2026-11-03 → 11/03
 
-    const head = '<tr><th>Салбар</th><th class="num">Нийт</th>' + dates.map((d) => `<th class="num">${dayLabel(d)}</th>`).join('') + '</tr>';
+    const head = '<tr><th>Салбар</th><th class="num">Энэ сарын нийт борлуулалт</th>' + dates.map((d) => `<th class="num">${dayLabel(d)}</th>`).join('') + '</tr>';
     const body = branches.map((b) => {
       const vals = dates.map((d) => cell[b + '|' + d]);
       return `<tr${b === HQ_BRANCH ? ' class="hq"' : ''}><td>${esc(b)}</td><td class="num grand">${fmt(sum(vals))}</td>` +
@@ -217,6 +219,7 @@
       dayTotals.map((v) => `<td class="num">${fmt(v)}</td>`).join('') + '</tr>';
 
     tbl.innerHTML = `<thead>${head}</thead><tbody>${body}${foot}</tbody>`;
+    tbl.style.setProperty('--c1', tbl.querySelector('th').offsetWidth + 'px');
     status.textContent = `${branches.length} салбар · ${dates.length} өдөр (${dayLabel(dates[0])}–${dayLabel(dates[dates.length - 1])})`;
   }
 
